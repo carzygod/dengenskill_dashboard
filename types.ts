@@ -49,3 +49,10 @@ export interface LogMessage {
   type: 'info' | 'success' | 'warning' | 'error';
   timestamp: number;
 }
+
+export interface IdeaBatch {
+  id: string;
+  label: string;
+  createdAt: number;
+  ideas: Idea[];
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ForgeConfig, Idea, LogMessage, Blueprint, Language } from './types';
+import { ForgeConfig, Idea, LogMessage, Blueprint, Language, IdeaBatch } from './types';
 import { TRANSLATIONS, LANG_NAMES } from './locales';
-import { generateIdeas, verifyIdea, generateBlueprint, generateContractCode, translateIdea, GeminiError } from './services/gemini';
+import { generateIdeas, verifyIdea, generateBlueprint, translateIdea, GeminiError } from './services/gemini';
 import ConfigPanel from './components/ConfigPanel';
 import TerminalOutput from './components/TerminalOutput';
 import IdeaCard from './components/IdeaCard';
@@ -9,7 +9,17 @@ import IdeaCarousel from './components/IdeaCarousel';
 import BlueprintModal from './components/BlueprintModal';
 import SettingsModal from './components/SettingsModal';
 import ErrorModal from './components/ErrorModal';
+import BatchDrawer from './components/BatchDrawer';
 import { Terminal, Zap, Globe, LayoutGrid, GalleryHorizontalEnd, Settings } from 'lucide-react';
+import { useAccount } from 'wagmi';
+
+const BATCH_STORAGE_KEY = 'idea_forge_batches';
+const MAX_BATCHES_STORED = 12;
+
+const truncateAddress = (address?: string) => {
+  if (!address) return null;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>(() => {
@@ -24,6 +34,11 @@ const App: React.FC = () => {
     quantity: 3,
     degenLevel: 20
   });
+
+  const [generatedBatches, setGeneratedBatches] = useState<IdeaBatch[]>([]);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const toggleDrawer = () => setIsDrawerOpen(prev => !prev);
+  const { address, isConnected: isWalletConnected } = useAccount();
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [logs, setLogs] = useState<LogMessage[]>([]);
@@ -49,6 +64,23 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('idea_forge_lang', lang);
   }, [lang]);
+
+  const persistBatches = (batches: IdeaBatch[]) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(batches));
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem(BATCH_STORAGE_KEY);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as IdeaBatch[];
+      setGeneratedBatches(parsed);
+    } catch {
+      // ignore corrupt data
+    }
+  }, []);
 
   const handleSaveSettings = (key: string) => {
     setUserApiKey(key);
@@ -113,6 +145,29 @@ const App: React.FC = () => {
       });
 
       setIdeas(generatedIdeas);
+      const batchLabelDate = new Date().toLocaleString(lang, { hour12: false });
+      const clonedBatchIdeas = generatedIdeas.map(idea => ({
+        ...idea,
+        features: [...idea.features],
+        verificationResult: idea.verificationResult
+          ? {
+              ...idea.verificationResult,
+              similarProjects: idea.verificationResult.similarProjects.map(project => ({ ...project })),
+            }
+          : undefined,
+        blueprint: idea.blueprint ? { ...idea.blueprint } : undefined,
+      }));
+      const newBatch: IdeaBatch = {
+        id: crypto.randomUUID(),
+        label: `${batchLabelDate} • ${config.mode === 'TARGETED' ? t.config.mode_targeted : t.config.mode_chaos}`,
+        createdAt: Date.now(),
+        ideas: clonedBatchIdeas,
+      };
+      setGeneratedBatches(prev => {
+        const next = [newBatch, ...prev].slice(0, MAX_BATCHES_STORED);
+        persistBatches(next);
+        return next;
+      });
       addLog(t.app.logs.batch, 'success');
     } catch (error) {
       addLog(t.app.logs.fail, 'error');
@@ -121,6 +176,20 @@ const App: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleRestoreBatch = (batchId: string) => {
+    const batch = generatedBatches.find(b => b.id === batchId);
+    if (!batch) return;
+    setIdeas(batch.ideas);
+    setSelectedIdea(null);
+    setActiveBlueprint(undefined);
+    addLog(`Restored batch from ${new Intl.DateTimeFormat(lang, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(batch.createdAt)}`, 'info');
   };
 
   const handleVerify = async (idea: Idea) => {
@@ -233,12 +302,19 @@ const App: React.FC = () => {
               <Settings className="w-4 h-4" />
             </button>
 
-            <span className="flex items-center gap-1.5 hidden sm:flex"><div className="w-1.5 h-1.5 rounded-full bg-[#00FF94] animate-pulse"></div> {t.navbar.status}</span>
+            <span className="flex items-center gap-1.5 hidden sm:flex">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#00FF94] animate-pulse"></div>
+              {isWalletConnected && address ? truncateAddress(address) : t.navbar.status}
+            </span>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 pt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main
+        className={`max-w-7xl mx-auto px-6 pt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 transition-all ${
+          isDrawerOpen ? 'lg:pr-[20rem]' : ''
+        }`}
+      >
 
         {/* Left Col: Config */}
         <div className="lg:col-span-4 space-y-6">
@@ -323,6 +399,14 @@ const App: React.FC = () => {
         </div>
 
       </main>
+
+      <BatchDrawer
+        batches={generatedBatches}
+        onRestore={handleRestoreBatch}
+        isOpen={isDrawerOpen}
+        onToggle={toggleDrawer}
+        lang={lang}
+      />
 
       {/* Settings Modal */}
       {isSettingsOpen && (
