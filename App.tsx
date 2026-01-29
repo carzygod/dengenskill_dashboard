@@ -12,7 +12,11 @@ import ErrorModal from './components/ErrorModal';
 import { Terminal, Zap, Globe, LayoutGrid, GalleryHorizontalEnd, Settings } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>(() => {
+    if (typeof window === 'undefined') return 'en';
+    const stored = window.localStorage.getItem('idea_forge_lang') as Language | null;
+    return stored && Object.keys(LANG_NAMES).includes(stored) ? stored : 'en';
+  });
   const [config, setConfig] = useState<ForgeConfig>({
     mode: 'TARGETED',
     ecosystems: ['Solana', 'Base'],
@@ -40,6 +44,11 @@ const App: React.FC = () => {
       setUserApiKey(storedKey);
     }
   }, []);
+
+  // Persist language preference locally whenever it changes
+  useEffect(() => {
+    localStorage.setItem('idea_forge_lang', lang);
+  }, [lang]);
 
   const handleSaveSettings = (key: string) => {
     setUserApiKey(key);
