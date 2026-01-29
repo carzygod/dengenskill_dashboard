@@ -26,8 +26,8 @@ const App: React.FC = () => {
   const [selectedIdea, setSelectedIdea] = useState<Idea | null>(null);
   const [activeBlueprint, setActiveBlueprint] = useState<Blueprint | undefined>(undefined);
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'GRID' | 'CAROUSEL'>('GRID');
-  
+  const [viewMode, setViewMode] = useState<'GRID' | 'CAROUSEL'>('CAROUSEL');
+
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [userApiKey, setUserApiKey] = useState('');
@@ -36,15 +36,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const storedKey = localStorage.getItem('idea_forge_api_key');
     if (storedKey) {
-        setUserApiKey(storedKey);
+      setUserApiKey(storedKey);
     }
   }, []);
 
   const handleSaveSettings = (key: string) => {
-      setUserApiKey(key);
-      localStorage.setItem('idea_forge_api_key', key);
-      setIsSettingsOpen(false);
-      addLog("System configuration updated.", 'success');
+    setUserApiKey(key);
+    localStorage.setItem('idea_forge_api_key', key);
+    setIsSettingsOpen(false);
+    addLog("System configuration updated.", 'success');
   };
 
   const t = TRANSLATIONS[lang];
@@ -57,9 +57,9 @@ const App: React.FC = () => {
     setIsGenerating(true);
     setIdeas([]);
     setLogs([]);
-    
+
     addLog(t.app.logs.init);
-    
+
     // Simulate thinking steps
     setTimeout(() => addLog(t.app.logs.scan.replace('{n}', config.ecosystems.length.toString())), 600);
     setTimeout(() => addLog(t.app.logs.analyze.replace('{sectors}', config.sectors.join(', '))), 1200);
@@ -67,11 +67,11 @@ const App: React.FC = () => {
     try {
       // Pass the userApiKey to the service
       const generatedIdeas = await generateIdeas(config, lang, userApiKey);
-      
+
       generatedIdeas.forEach((_, i) => {
-         setTimeout(() => {
-             addLog(t.app.logs.synth.replace('{n}', (i+1).toString()), 'success');
-         }, 1500 + (i * 200));
+        setTimeout(() => {
+          addLog(t.app.logs.synth.replace('{n}', (i + 1).toString()), 'success');
+        }, 1500 + (i * 200));
       });
 
       setIdeas(generatedIdeas);
@@ -90,12 +90,12 @@ const App: React.FC = () => {
 
     try {
       const result = await verifyIdea(idea, lang, userApiKey);
-      setIdeas(prev => prev.map(i => i.id === idea.id ? { 
-        ...i, 
+      setIdeas(prev => prev.map(i => i.id === idea.id ? {
+        ...i,
         status: 'VERIFIED',
         verificationResult: result
       } : i));
-      
+
       if (result.isUnique) {
         addLog(t.app.logs.verify_success.replace('{title}', idea.title), 'success');
       } else {
@@ -113,168 +113,168 @@ const App: React.FC = () => {
     setActiveBlueprint(idea.blueprint); // Might be undefined initially
 
     if (!idea.blueprint) {
-        // Generate on fly
-        try {
-            const blueprint = await generateBlueprint(idea, lang, userApiKey);
-            setActiveBlueprint(blueprint);
-            // Cache it
-            setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, blueprint } : i));
-        } catch (error) {
-            console.error(error);
-        }
+      // Generate on fly
+      try {
+        const blueprint = await generateBlueprint(idea, lang, userApiKey);
+        setActiveBlueprint(blueprint);
+        // Cache it
+        setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, blueprint } : i));
+      } catch (error) {
+        console.error(error);
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-[#050505] text-gray-200 pb-20 relative cyber-grid">
       <div className="scanline"></div>
-      
+
       {/* Navbar */}
       <nav className="border-b border-white/5 bg-black/50 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-                <div className="bg-[#00FF94] p-1 rounded">
-                    <Terminal className="w-4 h-4 text-black" />
-                </div>
-                <span className="font-bold tracking-wider text-white">{t.navbar.title}</span>
-                <span className="text-[10px] font-mono text-gray-500 border border-white/10 px-1 rounded">{t.navbar.subtitle}</span>
+          <div className="flex items-center gap-2">
+            <div className="bg-[#00FF94] p-1 rounded">
+              <Terminal className="w-4 h-4 text-black" />
             </div>
-            <div className="flex items-center gap-6 text-xs font-mono text-gray-400">
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsLangOpen(!isLangOpen)}
-                    className="flex items-center gap-2 hover:text-white transition-colors"
-                  >
-                    <Globe className="w-4 h-4" />
-                    <span className="uppercase">{LANG_NAMES[lang]}</span>
-                  </button>
-                  {isLangOpen && (
-                    <div className="absolute top-8 right-0 bg-black border border-white/10 rounded-lg p-1 min-w-[120px] shadow-xl z-50">
-                      {(Object.keys(LANG_NAMES) as Language[]).map((l) => (
-                        <button
-                          key={l}
-                          onClick={() => { setLang(l); setIsLangOpen(false); }}
-                          className={`w-full text-left px-3 py-2 rounded text-xs hover:bg-white/5 ${lang === l ? 'text-[#00FF94]' : 'text-gray-400'}`}
-                        >
-                          {LANG_NAMES[l]}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <span className="font-bold tracking-wider text-white">{t.navbar.title}</span>
+            <span className="text-[10px] font-mono text-gray-500 border border-white/10 px-1 rounded">{t.navbar.subtitle}</span>
+          </div>
+          <div className="flex items-center gap-6 text-xs font-mono text-gray-400">
+            <div className="relative">
+              <button
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="flex items-center gap-2 hover:text-white transition-colors"
+              >
+                <Globe className="w-4 h-4" />
+                <span className="uppercase">{LANG_NAMES[lang]}</span>
+              </button>
+              {isLangOpen && (
+                <div className="absolute top-8 right-0 bg-black border border-white/10 rounded-lg p-1 min-w-[120px] shadow-xl z-50">
+                  {(Object.keys(LANG_NAMES) as Language[]).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => { setLang(l); setIsLangOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded text-xs hover:bg-white/5 ${lang === l ? 'text-[#00FF94]' : 'text-gray-400'}`}
+                    >
+                      {LANG_NAMES[l]}
+                    </button>
+                  ))}
                 </div>
-                
-                {/* Settings Button */}
-                <button 
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="hover:text-white transition-colors"
-                    title="Settings"
-                >
-                    <Settings className="w-4 h-4" />
-                </button>
+              )}
+            </div>
 
-                <span className="flex items-center gap-1.5 hidden sm:flex"><div className="w-1.5 h-1.5 rounded-full bg-[#00FF94] animate-pulse"></div> {t.navbar.status}</span>
-            </div>
+            {/* Settings Button */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="hover:text-white transition-colors"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            <span className="flex items-center gap-1.5 hidden sm:flex"><div className="w-1.5 h-1.5 rounded-full bg-[#00FF94] animate-pulse"></div> {t.navbar.status}</span>
+          </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 pt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
+
         {/* Left Col: Config */}
         <div className="lg:col-span-4 space-y-6">
-            <ConfigPanel 
-                config={config} 
-                setConfig={setConfig} 
-                onGenerate={handleGenerate}
-                isGenerating={isGenerating}
-                t={t.config}
-            />
-            
-            <TerminalOutput logs={logs} isThinking={isGenerating} t={t.terminal} />
+          <ConfigPanel
+            config={config}
+            setConfig={setConfig}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+            t={t.config}
+          />
+
+          <TerminalOutput logs={logs} isThinking={isGenerating} t={t.terminal} />
         </div>
 
         {/* Right Col: Results */}
         <div className="lg:col-span-8">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-[#00FF94]" /> {t.app.protocols}
-                </h2>
-                
-                <div className="flex items-center gap-4">
-                    <span className="text-xs font-mono text-gray-500 hidden sm:inline">{t.app.count}: {ideas.length}</span>
-                    
-                    {/* View Toggle */}
-                    <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
-                        <button
-                            onClick={() => setViewMode('GRID')}
-                            className={`p-2 rounded transition-all ${viewMode === 'GRID' ? 'bg-[#00FF94] text-black' : 'text-gray-400 hover:text-white'}`}
-                            title={t.app.view_grid}
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('CAROUSEL')}
-                            className={`p-2 rounded transition-all ${viewMode === 'CAROUSEL' ? 'bg-[#FF00FF] text-black' : 'text-gray-400 hover:text-white'}`}
-                            title={t.app.view_carousel}
-                        >
-                            <GalleryHorizontalEnd className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            </div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Zap className="w-5 h-5 text-[#00FF94]" /> {t.app.protocols}
+            </h2>
 
-            {ideas.length === 0 ? (
-                <div className="h-[500px] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-gray-600 space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-                        <Terminal className="w-8 h-8 opacity-50" />
-                    </div>
-                    <p className="font-mono text-sm">{t.app.awaiting}</p>
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-mono text-gray-500 hidden sm:inline">{t.app.count}: {ideas.length}</span>
+
+              {/* View Toggle */}
+              <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
+                <button
+                  onClick={() => setViewMode('GRID')}
+                  className={`p-2 rounded transition-all ${viewMode === 'GRID' ? 'bg-[#00FF94] text-black' : 'text-gray-400 hover:text-white'}`}
+                  title={t.app.view_grid}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('CAROUSEL')}
+                  className={`p-2 rounded transition-all ${viewMode === 'CAROUSEL' ? 'bg-[#FF00FF] text-black' : 'text-gray-400 hover:text-white'}`}
+                  title={t.app.view_carousel}
+                >
+                  <GalleryHorizontalEnd className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {ideas.length === 0 ? (
+            <div className="h-[500px] border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center text-gray-600 space-y-4">
+              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+                <Terminal className="w-8 h-8 opacity-50" />
+              </div>
+              <p className="font-mono text-sm">{t.app.awaiting}</p>
+            </div>
+          ) : (
+            <>
+              {viewMode === 'GRID' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {ideas.map(idea => (
+                    <IdeaCard
+                      key={idea.id}
+                      idea={idea}
+                      onVerify={handleVerify}
+                      onViewBlueprint={handleViewBlueprint}
+                      t={t.card}
+                    />
+                  ))}
                 </div>
-            ) : (
-                <>
-                    {viewMode === 'GRID' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {ideas.map(idea => (
-                                <IdeaCard 
-                                    key={idea.id} 
-                                    idea={idea} 
-                                    onVerify={handleVerify}
-                                    onViewBlueprint={handleViewBlueprint}
-                                    t={t.card}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <IdeaCarousel 
-                            ideas={ideas}
-                            onVerify={handleVerify}
-                            onViewBlueprint={handleViewBlueprint}
-                            t={t.card}
-                        />
-                    )}
-                </>
-            )}
+              ) : (
+                <IdeaCarousel
+                  ideas={ideas}
+                  onVerify={handleVerify}
+                  onViewBlueprint={handleViewBlueprint}
+                  t={t.card}
+                />
+              )}
+            </>
+          )}
         </div>
 
       </main>
 
       {/* Settings Modal */}
       {isSettingsOpen && (
-        <SettingsModal 
-            currentApiKey={userApiKey} 
-            onSave={handleSaveSettings} 
-            onClose={() => setIsSettingsOpen(false)} 
-            t={t.settings}
+        <SettingsModal
+          currentApiKey={userApiKey}
+          onSave={handleSaveSettings}
+          onClose={() => setIsSettingsOpen(false)}
+          t={t.settings}
         />
       )}
 
       {/* Blueprint Modal */}
       {selectedIdea && (
-          <BlueprintModal 
-            idea={selectedIdea} 
-            blueprint={activeBlueprint} 
-            onClose={() => setSelectedIdea(null)} 
-            t={t.modal}
-          />
+        <BlueprintModal
+          idea={selectedIdea}
+          blueprint={activeBlueprint}
+          onClose={() => setSelectedIdea(null)}
+          t={t.modal}
+        />
       )}
     </div>
   );
