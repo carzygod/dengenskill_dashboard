@@ -10,7 +10,7 @@ import BlueprintModal from './components/BlueprintModal';
 import SettingsModal from './components/SettingsModal';
 import ErrorModal from './components/ErrorModal';
 import BatchDrawer from './components/BatchDrawer';
-import { Terminal, Zap, Globe, LayoutGrid, GalleryHorizontalEnd, Settings } from 'lucide-react';
+import { Terminal, Zap, Globe, LayoutGrid, GalleryHorizontalEnd, Settings, Github, Twitter } from 'lucide-react';
 import { useAccount } from 'wagmi';
 
 const BATCH_STORAGE_KEY = 'idea_forge_batches';
@@ -437,6 +437,41 @@ const App: React.FC = () => {
         code={errorState.code}
         t={{ dismiss: t.modal?.dismiss || "Dismiss" }}
       />
+
+      <footer className="mt-10 border-t border-white/5 bg-black/40 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex justify-center gap-6 text-xs font-mono text-gray-400">
+          <a
+            className="rounded-full bg-white/5 p-2 text-[#00FF94] transition hover:bg-white/10"
+            href="https://github.com/carzygod"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+          >
+            <Github className="h-5 w-5" />
+            <span className="sr-only">GitHub</span>
+          </a>
+          <a
+            className="rounded-full bg-white/5 p-2 text-[#00FF94] transition hover:bg-white/10"
+            href="https://www.sidcloud.cn/"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Website"
+          >
+            <Globe className="h-5 w-5" />
+            <span className="sr-only">Website</span>
+          </a>
+          <a
+            className="rounded-full bg-white/5 p-2 text-[#00FF94] transition hover:bg-white/10"
+            href="https://x.com/carzygod"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="X"
+          >
+            <Twitter className="h-5 w-5" />
+            <span className="sr-only">X</span>
+          </a>
+        </div>
+      </footer>
     </div>
   );
 };
