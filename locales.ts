@@ -38,7 +38,8 @@ export const TRANSLATIONS = {
       degen_balanced: "Innovative (Balanced)",
       degen_chaos: "Ponzi / Degen (Chaos)",
       context_label: "ADDITIONAL CONTEXT (OPTIONAL)",
-      context_placeholder: "e.g. A gamified yield aggregator on Solana..."
+      context_placeholder: "e.g. A gamified yield aggregator on Solana...",
+      connect_wallet: "CONNECT WALLET"
     },
     card: {
       degen: "DEGEN",
@@ -122,7 +123,8 @@ export const TRANSLATIONS = {
       degen_balanced: "创新级 (平衡)",
       degen_chaos: "土狗 / 庞氏 (混乱)",
       context_label: "额外背景 (可选)",
-      context_placeholder: "例如：Solana 上的游戏化收益聚合器..."
+      context_placeholder: "例如：Solana 上的游戏化收益聚合器...",
+      connect_wallet: "连接钱包"
     },
     card: {
       degen: "疯狂度",
@@ -206,7 +208,8 @@ export const TRANSLATIONS = {
       degen_balanced: "創新級 (平衡)",
       degen_chaos: "土狗 / 龐氏 (混亂)",
       context_label: "額外背景 (可選)",
-      context_placeholder: "例如：Solana 上的遊戲化收益聚合器..."
+      context_placeholder: "例如：Solana 上的遊戲化收益聚合器...",
+      connect_wallet: "連接錢包"
     },
     card: {
       degen: "瘋狂度",
@@ -290,7 +293,8 @@ export const TRANSLATIONS = {
       degen_balanced: "Инновационный (Сбалансированно)",
       degen_chaos: "Понци / Деген (Хаос)",
       context_label: "ДОПОЛНИТЕЛЬНЫЙ КОНТЕКСТ (ОПЦИОНАЛЬНО)",
-      context_placeholder: "напр. Геймифицированный агрегатор доходности на Solana..."
+      context_placeholder: "напр. Геймифицированный агрегатор доходности на Solana...",
+      connect_wallet: "ПОДКЛЮЧИТЬ КОШЕЛЕК"
     },
     card: {
       degen: "ДЕГЕН",
