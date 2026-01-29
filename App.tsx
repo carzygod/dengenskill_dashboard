@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ForgeConfig, Idea, LogMessage, Blueprint, Language } from './types';
 import { TRANSLATIONS, LANG_NAMES } from './locales';
-import { generateIdeas, verifyIdea, generateBlueprint, generateContractCode, translateIdea } from './services/gemini';
+import { generateIdeas, verifyIdea, generateBlueprint, generateContractCode, translateIdea, GeminiError } from './services/gemini';
 import ConfigPanel from './components/ConfigPanel';
 import TerminalOutput from './components/TerminalOutput';
 import IdeaCard from './components/IdeaCard';
 import IdeaCarousel from './components/IdeaCarousel';
 import BlueprintModal from './components/BlueprintModal';
 import SettingsModal from './components/SettingsModal';
+import ErrorModal from './components/ErrorModal';
 import { Terminal, Zap, Globe, LayoutGrid, GalleryHorizontalEnd, Settings } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -47,6 +48,34 @@ const App: React.FC = () => {
     addLog("System configuration updated.", 'success');
   };
 
+  // Error State
+  const [errorState, setErrorState] = useState<{ isOpen: boolean; title: string; message: string; code?: string }>({
+    isOpen: false,
+    title: '',
+    message: ''
+  });
+
+  const handleError = (error: any) => {
+    let title = "System Error";
+    let message = "An unexpected error occurred.";
+    let code = undefined;
+
+    if (error instanceof GeminiError) {
+      title = "AI Model Error";
+      message = error.message;
+      code = error.code;
+    } else if (error instanceof Error) {
+      message = error.message;
+    }
+
+    setErrorState({
+      isOpen: true,
+      title,
+      message,
+      code
+    });
+  };
+
   const t = TRANSLATIONS[lang];
 
   const addLog = (text: string, type: LogMessage['type'] = 'info') => {
@@ -79,6 +108,7 @@ const App: React.FC = () => {
     } catch (error) {
       addLog(t.app.logs.fail, 'error');
       console.error(error);
+      handleError(error);
     } finally {
       setIsGenerating(false);
     }
@@ -121,6 +151,7 @@ const App: React.FC = () => {
         setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, blueprint } : i));
       } catch (error) {
         console.error(error);
+        handleError(error);
       }
     }
   };
@@ -136,6 +167,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Translation Error", error);
       addLog(`Translation failed for ${idea.title}`, 'error');
+      handleError(error);
     } finally {
       setTranslatingIds(prev => {
         const next = new Set(prev);
@@ -302,6 +334,16 @@ const App: React.FC = () => {
           t={t.modal}
         />
       )}
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorState.isOpen}
+        onClose={() => setErrorState(prev => ({ ...prev, isOpen: false }))}
+        title={errorState.title}
+        message={errorState.message}
+        code={errorState.code}
+        t={{ dismiss: t.modal?.dismiss || "Dismiss" }}
+      />
     </div>
   );
 };

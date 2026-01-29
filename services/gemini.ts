@@ -2,12 +2,42 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { ForgeConfig, Idea, VerificationResult, Blueprint, Language } from "../types";
 import { PROMPT_LANG_MAP } from "../locales";
 
+// Custom Error Class
+export class GeminiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'GeminiError';
+    this.code = code;
+  }
+}
+
 const getClient = (customApiKey?: string) => {
   // Priority: User's custom key > Environment variable
   const apiKey = customApiKey || process.env.API_KEY;
-  if (!apiKey) throw new Error("API_KEY not found. Please provide a key in settings or .env");
+  if (!apiKey) throw new GeminiError("API_KEY not found. Please provide a key in settings or .env", "NO_API_KEY");
   return new GoogleGenAI({ apiKey });
 };
+
+const handleGeminiError = (error: any) => {
+  console.error("Gemini API Error:", error);
+
+  const msg = error.message || "";
+
+  // Check for 429
+  if (msg.includes("429") || msg.includes("Too Many Requests") || msg.includes("Resource has been exhausted")) {
+    throw new GeminiError("High traffic. The AI brain is overheated. Please wait a moment and try again.", "RATE_LIMIT_429");
+  }
+
+  // Check for 401
+  if (msg.includes("401") || msg.includes("API key not valid")) {
+    throw new GeminiError("Invalid API Key. Please check your settings.", "INVALID_KEY_401");
+  }
+
+  // Default
+  throw new GeminiError("Transformation failed. The connection to the datastream was interrupted.", "UNKNOWN_ERROR");
+};
+
 
 export const generateIdeas = async (config: ForgeConfig, lang: Language, apiKey?: string): Promise<Idea[]> => {
   const ai = getClient(apiKey);
@@ -75,7 +105,7 @@ export const generateIdeas = async (config: ForgeConfig, lang: Language, apiKey?
     }));
 
   } catch (error) {
-    console.error("Gemini Generation Error:", error);
+    handleGeminiError(error);
     throw error;
   }
 };
@@ -129,11 +159,12 @@ export const verifyIdea = async (idea: Idea, lang: Language, apiKey?: string): P
 
   } catch (error) {
     console.error("Verification Error:", error);
-    // Fallback if search fails
+    // Silent fail for verification loops is usually better, but for 429 we might want to alert if it's manual
+    // For now, let's just log but NOT throw to avoid interrupting the batch
     return {
       isUnique: true,
       similarProjects: [],
-      notes: "Verification unavailable. Proceed with caution."
+      notes: "Verification unavailable due to network or rate limit."
     };
   }
 };
@@ -169,18 +200,23 @@ export const generateBlueprint = async (idea: Idea, lang: Language, apiKey?: str
     required: ["overview", "tokenomics", "roadmap", "technicalArchitecture"]
   };
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: responseSchema
-    }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    });
 
-  if (!response.text) throw new Error("No blueprint generated");
+    if (!response.text) throw new Error("No blueprint generated");
 
-  return JSON.parse(response.text) as Blueprint;
+    return JSON.parse(response.text) as Blueprint;
+  } catch (error) {
+    handleGeminiError(error);
+    throw error;
+  }
 };
 
 export const translateIdea = async (idea: Idea, targetLang: Language, apiKey?: string): Promise<Idea> => {
@@ -234,7 +270,7 @@ export const translateIdea = async (idea: Idea, targetLang: Language, apiKey?: s
     };
 
   } catch (error) {
-    console.error("Translation Error:", error);
+    handleGeminiError(error);
     throw error;
   }
 };

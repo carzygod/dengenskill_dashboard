@@ -61,7 +61,7 @@ export const TRANSLATIONS = {
       build_logs: "BUILD_LOGS",
       gen_assets: "GENERATED_ASSETS",
       init_builder: "INITIALIZE AUTO-BUILDER",
-      view_deploy: "VIEW DEPLOYMENT (SIMULATED)",
+      view_deploy: "1-CLICK DEPLOY (DEV WIP)",
       architecting: "ARCHITECTING BLUEPRINT...",
       waiting: "Waiting for command...",
       no_assets: "[NO ASSETS GENERATED]"
@@ -145,7 +145,7 @@ export const TRANSLATIONS = {
       build_logs: "构建日志",
       gen_assets: "生成资产",
       init_builder: "启动自动构建器",
-      view_deploy: "查看部署 (模拟)",
+      view_deploy: "一键部署 (功能开发中)",
       architecting: "正在规划蓝图...",
       waiting: "等待指令...",
       no_assets: "[未生成资产]"
