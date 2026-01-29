@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ForgeConfig, Idea, LogMessage, Blueprint, Language } from './types';
 import { TRANSLATIONS, LANG_NAMES } from './locales';
-import { generateIdeas, verifyIdea, generateBlueprint, generateContractCode } from './services/gemini';
+import { generateIdeas, verifyIdea, generateBlueprint, generateContractCode, translateIdea } from './services/gemini';
 import ConfigPanel from './components/ConfigPanel';
 import TerminalOutput from './components/TerminalOutput';
 import IdeaCard from './components/IdeaCard';
@@ -125,6 +125,26 @@ const App: React.FC = () => {
     }
   };
 
+  const [translatingIds, setTranslatingIds] = useState<Set<string>>(new Set());
+
+  const handleTranslate = async (idea: Idea) => {
+    setTranslatingIds(prev => new Set(prev).add(idea.id));
+    try {
+      const translatedIdea = await translateIdea(idea, lang, userApiKey);
+      setIdeas(prev => prev.map(i => i.id === idea.id ? translatedIdea : i));
+      addLog(`Translated ${idea.title} to ${lang}`, 'success');
+    } catch (error) {
+      console.error("Translation Error", error);
+      addLog(`Translation failed for ${idea.title}`, 'error');
+    } finally {
+      setTranslatingIds(prev => {
+        const next = new Set(prev);
+        next.delete(idea.id);
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-gray-200 pb-20 relative cyber-grid">
       <div className="scanline"></div>
@@ -239,6 +259,9 @@ const App: React.FC = () => {
                       idea={idea}
                       onVerify={handleVerify}
                       onViewBlueprint={handleViewBlueprint}
+                      onTranslate={handleTranslate}
+                      isTranslating={translatingIds.has(idea.id)}
+                      currentLang={lang}
                       t={t.card}
                     />
                   ))}
@@ -248,6 +271,9 @@ const App: React.FC = () => {
                   ideas={ideas}
                   onVerify={handleVerify}
                   onViewBlueprint={handleViewBlueprint}
+                  onTranslate={handleTranslate}
+                  isTranslating={id => translatingIds.has(id)}
+                  currentLang={lang}
                   t={t.card}
                 />
               )}

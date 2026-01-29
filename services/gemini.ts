@@ -70,7 +70,8 @@ export const generateIdeas = async (config: ForgeConfig, lang: Language, apiKey?
     return rawIdeas.map((idea: any) => ({
       ...idea,
       id: crypto.randomUUID(),
-      status: 'GENERATED'
+      status: 'GENERATED',
+      language: lang
     }));
 
   } catch (error) {
@@ -180,6 +181,62 @@ export const generateBlueprint = async (idea: Idea, lang: Language, apiKey?: str
   if (!response.text) throw new Error("No blueprint generated");
 
   return JSON.parse(response.text) as Blueprint;
+};
+
+export const translateIdea = async (idea: Idea, targetLang: Language, apiKey?: string): Promise<Idea> => {
+  const ai = getClient(apiKey);
+  const langName = PROMPT_LANG_MAP[targetLang];
+
+  const prompt = `Translate the following Web3 project idea into ${langName}.
+  Maintain the original tone, style, and technical accuracy.
+  
+  Input:
+  Title: ${idea.title}
+  Tagline: ${idea.tagline}
+  Description: ${idea.description}
+  Features: ${idea.features.join(', ')}
+  
+  Return a JSON object with: title, tagline, description, features (array of strings).
+  `;
+
+  const responseSchema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+      title: { type: Type.STRING },
+      tagline: { type: Type.STRING },
+      description: { type: Type.STRING },
+      features: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      }
+    },
+    required: ["title", "tagline", "description", "features"]
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    });
+
+    if (!response.text) throw new Error("Translation failed");
+
+    const translated = JSON.parse(response.text);
+
+    return {
+      ...idea,
+      ...translated,
+      language: targetLang
+    };
+
+  } catch (error) {
+    console.error("Translation Error:", error);
+    throw error;
+  }
 };
 
 export const generateContractCode = async (idea: Idea, apiKey?: string): Promise<string> => {

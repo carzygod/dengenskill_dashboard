@@ -23,6 +23,7 @@ export interface Idea {
   status: 'GENERATED' | 'VERIFYING' | 'VERIFIED' | 'FAILED';
   verificationResult?: VerificationResult;
   blueprint?: Blueprint;
+  language?: Language;
 }
 
 export interface VerificationResult {
