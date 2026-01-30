@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Idea, Blueprint } from '../types';
 import { generateContractCode } from '../services/gemini';
-import { X, Code, Terminal, UploadCloud, Cpu, FileText, CheckCircle2, Copy } from 'lucide-react';
+import { X, Code, Terminal, UploadCloud, Cpu, FileText, CheckCircle2, Copy, Download } from 'lucide-react';
+import { PDFDocument, StandardFonts, rgb, PDFFont } from 'pdf-lib';
 
 interface BlueprintModalProps {
     idea: Idea;
@@ -10,11 +11,131 @@ interface BlueprintModalProps {
     t: any;
 }
 
+const wrapTextLines = (text: string, font: PDFFont, size: number, maxWidth: number) => {
+    const results: string[] = [];
+    const breakWord = (word: string) => {
+        let current = '';
+        for (const char of word) {
+            const candidate = `${current}${char}`;
+            if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+                current = candidate;
+            } else {
+                if (current) {
+                    results.push(current);
+                }
+                current = char;
+            }
+        }
+        if (current) {
+            results.push(current);
+        }
+    };
+
+    if (!text.trim()) {
+        return [''];
+    }
+
+    const words = text.split(' ');
+    let currentLine = '';
+    const flushCurrent = () => {
+        if (currentLine) {
+            results.push(currentLine);
+            currentLine = '';
+        }
+    };
+
+    for (const word of words) {
+        const candidate = currentLine ? `${currentLine} ${word}` : word;
+        if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+            currentLine = candidate;
+            continue;
+        }
+
+        flushCurrent();
+
+        if (font.widthOfTextAtSize(word, size) <= maxWidth) {
+            currentLine = word;
+            continue;
+        }
+
+        breakWord(word);
+    }
+
+    flushCurrent();
+    return results;
+};
+
+const createPdfBlob = async (text: string) => {
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 12;
+    const lineHeight = 16;
+    const margin = 36;
+    let page = pdfDoc.addPage([612, 792]);
+    let y = page.getHeight() - margin;
+    const maxWidth = page.getWidth() - margin * 2;
+
+    for (const rawLine of text.split('\n')) {
+        const lines = wrapTextLines(rawLine, font, fontSize, maxWidth);
+        for (const line of lines) {
+            if (y <= margin) {
+                page = pdfDoc.addPage([612, 792]);
+                y = page.getHeight() - margin;
+            }
+            page.drawText(line, {
+                x: margin,
+                y,
+                font,
+                size: fontSize,
+                color: rgb(0.93, 0.93, 0.93),
+            });
+            y -= lineHeight;
+        }
+        y -= lineHeight / 2;
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+};
+
+const blueprintToMarkdown = (idea: Idea, blueprint: Blueprint) => {
+    const sections = [
+        `# ${idea.title}`,
+        ``,
+        `**Ecosystem:** ${idea.ecosystem}`,
+        `**Sector:** ${idea.sector}`,
+        `**Degen Score:** ${idea.degenScore}%`,
+        ``,
+        `## Executive Summary`,
+        blueprint.overview,
+        ``,
+        `## Tokenomics`,
+        blueprint.tokenomics,
+        ``,
+        `## Roadmap`,
+        blueprint.roadmap,
+        ``,
+        `## Technical Architecture`,
+        blueprint.technicalArchitecture,
+    ];
+
+    if (blueprint.contractCode) {
+        sections.push(``, `## Contract Code`, '```solidity', blueprint.contractCode, '```');
+    }
+
+    if (blueprint.frontendSnippet) {
+        sections.push(``, `## Frontend Snippet`, '```tsx', blueprint.frontendSnippet, '```');
+    }
+
+    return sections.join('\n');
+};
+
 const BlueprintModal: React.FC<BlueprintModalProps> = ({ idea, blueprint, onClose, t }) => {
     const [activeTab, setActiveTab] = useState<'DOCS' | 'BUILDER'>('DOCS');
     const [buildStep, setBuildStep] = useState<number>(0); // 0: Idle, 1: Contract, 2: Dapp, 3: Deploy
     const [contractCode, setContractCode] = useState<string>('');
     const [buildLogs, setBuildLogs] = useState<string[]>([]);
+    const blueprintMarkdown = useMemo(() => blueprint ? blueprintToMarkdown(idea, blueprint) : '', [blueprint, idea]);
 
     const addToLog = (msg: string) => setBuildLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
@@ -53,6 +174,28 @@ const BlueprintModal: React.FC<BlueprintModalProps> = ({ idea, blueprint, onClos
             addToLog("Error in build pipeline.");
             setBuildStep(0);
         }
+    };
+
+    const downloadFile = (filename: string, data: Blob | string, mime: string) => {
+        const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    };
+
+    const handleExportMarkdown = () => {
+        if (!blueprint) return;
+        const safeName = idea.title.replace(/[^a-z0-9]+/gi, '_') || 'blueprint';
+        downloadFile(`${safeName}.md`, blueprintMarkdown, 'text/markdown');
+    };
+
+    const handleExportPdf = async () => {
+        if (!blueprint) return;
+        const safeName = idea.title.replace(/[^a-z0-9]+/gi, '_') || 'blueprint';
+        const blob = await createPdfBlob(blueprintMarkdown || '');
+        downloadFile(`${safeName}.pdf`, blob, 'application/pdf');
     };
 
     return (
@@ -94,7 +237,23 @@ const BlueprintModal: React.FC<BlueprintModalProps> = ({ idea, blueprint, onClos
                     {activeTab === 'DOCS' ? (
                         blueprint ? (
                             <div className="space-y-8 max-w-3xl mx-auto">
-                                <section>
+                                <section className="flex flex-col gap-4">
+                                    <div className="flex flex-wrap gap-2 justify-end">
+                                        <button
+                                            onClick={handleExportMarkdown}
+                                            disabled={!blueprint}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 text-xs font-mono rounded-full border border-white/10 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                        >
+                                            <FileText className="w-4 h-4 text-[#00FF94]" /> Markdown
+                                        </button>
+                                        <button
+                                            onClick={handleExportPdf}
+                                            disabled={!blueprint}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 text-xs font-mono rounded-full border border-white/10 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                        >
+                                            <Download className="w-4 h-4 text-[#FF00FF]" /> PDF
+                                        </button>
+                                    </div>
                                     <h3 className="text-[#00FF94] font-mono text-sm mb-3 uppercase tracking-widest flex items-center gap-2">
                                         <FileText className="w-4 h-4" /> {t.exec_summary}
                                     </h3>
