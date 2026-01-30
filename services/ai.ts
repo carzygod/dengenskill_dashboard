@@ -147,16 +147,6 @@ const parseJsonOrThrow = <T>(raw: string, context: string): T => {
   throw new AIError(`Failed to parse AI JSON response (${context}).`, "INVALID_JSON");
 };
 
-const toDisplayString = (value: unknown): string => {
-  if (typeof value === 'string') return value;
-  if (value == null) return '';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
 export const generateIdeas = async (config: ForgeConfig, lang: Language, apiConfig?: AISettings): Promise<Idea[]> => {
   const langName = PROMPT_LANG_MAP[lang];
   const prompt = config.mode === 'RANDOM'
@@ -210,9 +200,23 @@ export const verifyIdea = async (idea: Idea, lang: Language, apiConfig?: AISetti
   };
 };
 
+const serializeBlueprintField = (value: any): string => {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  if (Array.isArray(value)) {
+    return value.map(item => serializeBlueprintField(item)).filter(Boolean).join('； ');
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, child]) => `${key}: ${serializeBlueprintField(child)}`)
+      .join('； ');
+  }
+  return String(value);
+};
+
 export const generateBlueprint = async (idea: Idea, lang: Language, apiConfig?: AISettings): Promise<Blueprint> => {
   const langName = PROMPT_LANG_MAP[lang];
-  const prompt = `Craft a technical blueprint for ${idea.title} (Sector: ${idea.sector}, Chain: ${idea.ecosystem}). Include Executive Summary, Tokenomics, Roadmap (4 phases), Technical Architecture. Return JSON with { overview, tokenomics, roadmap, technicalArchitecture } in ${langName}.`;
+  const prompt = `Craft a technical blueprint for ${idea.title} (Sector: ${idea.sector}, Chain: ${idea.ecosystem}). Include Executive Summary, Tokenomics, Roadmap (4 phases), and Technical Architecture. Return JSON with { overview, tokenomics, roadmap, technicalArchitecture } where each field is expressed as a natural language paragraph or sentences (no nested JSON structures) in ${langName}.`;
 
   const messages = [
     { role: 'system', content: 'Respond only with JSON describing blueprint sections.' },
@@ -222,13 +226,13 @@ export const generateBlueprint = async (idea: Idea, lang: Language, apiConfig?: 
   const rawResponse = await callChatCompletion(messages, apiConfig, 0.3, 1200);
   const parsed = parseJsonOrThrow<Blueprint>(rawResponse, 'generateBlueprint');
   return {
-    overview: toDisplayString(parsed.overview),
-    tokenomics: toDisplayString(parsed.tokenomics),
-    roadmap: toDisplayString(parsed.roadmap),
-    technicalArchitecture: toDisplayString(parsed.technicalArchitecture),
-    contractCode: parsed.contractCode ? toDisplayString(parsed.contractCode) : undefined,
-    frontendSnippet: parsed.frontendSnippet ? toDisplayString(parsed.frontendSnippet) : undefined,
-    deploymentUrl: toDisplayString(parsed.deploymentUrl)
+    overview: serializeBlueprintField(parsed.overview),
+    tokenomics: serializeBlueprintField(parsed.tokenomics),
+    roadmap: serializeBlueprintField(parsed.roadmap),
+    technicalArchitecture: serializeBlueprintField(parsed.technicalArchitecture),
+    contractCode: parsed.contractCode ? serializeBlueprintField(parsed.contractCode) : undefined,
+    frontendSnippet: parsed.frontendSnippet ? serializeBlueprintField(parsed.frontendSnippet) : undefined,
+    deploymentUrl: serializeBlueprintField(parsed.deploymentUrl)
   };
 };
 

@@ -62,14 +62,22 @@ const App: React.FC = () => {
 
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [aiSettings, setAiSettings] = useState<AISettings>({});
+  const defaultAiSettings: AISettings = {
+    baseUrl: process.env.OPENAI_BASE_URL || '',
+    model: process.env.OPENAI_MODEL || ''
+  };
+  const [aiSettings, setAiSettings] = useState<AISettings>(() => ({ ...defaultAiSettings }));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const storedConfig = window.localStorage.getItem('idea_forge_ai_config');
     if (storedConfig) {
       try {
-        setAiSettings(JSON.parse(storedConfig));
+        const parsed = JSON.parse(storedConfig) as AISettings;
+        setAiSettings({
+          ...defaultAiSettings,
+          ...parsed
+        });
         return;
       } catch {
         // ignore
@@ -78,17 +86,11 @@ const App: React.FC = () => {
     const legacyKey = window.localStorage.getItem('idea_forge_api_key');
     if (legacyKey) {
       setAiSettings({
-        apiKey: legacyKey,
-        baseUrl: process.env.OPENAI_BASE_URL,
-        model: process.env.OPENAI_MODEL,
+        ...defaultAiSettings,
+        apiKey: legacyKey
       });
       return;
     }
-    setAiSettings({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseUrl: process.env.OPENAI_BASE_URL,
-      model: process.env.OPENAI_MODEL,
-    });
   }, []);
 
   // Persist language preference locally whenever it changes
@@ -114,9 +116,18 @@ const App: React.FC = () => {
   }, []);
 
   const handleSaveSettings = (config: AISettings) => {
-    setAiSettings(config);
+    const normalized = {
+      apiKey: config.apiKey?.trim() ?? '',
+      baseUrl: config.baseUrl?.trim() ?? '',
+      model: config.model?.trim() ?? '',
+    };
+    setAiSettings({
+      apiKey: normalized.apiKey,
+      baseUrl: normalized.baseUrl || defaultAiSettings.baseUrl,
+      model: normalized.model || defaultAiSettings.model,
+    });
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('idea_forge_ai_config', JSON.stringify(config));
+      window.localStorage.setItem('idea_forge_ai_config', JSON.stringify(normalized));
     }
     setIsSettingsOpen(false);
     addLog("System configuration updated.", 'success');
