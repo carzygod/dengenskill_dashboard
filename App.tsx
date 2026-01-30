@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ForgeConfig, Idea, LogMessage, Blueprint, Language, IdeaBatch } from './types';
+import { ForgeConfig, Idea, LogMessage, Blueprint, Language, IdeaBatch, AISettings } from './types';
 import { TRANSLATIONS, LANG_NAMES } from './locales';
-import { generateIdeas, verifyIdea, generateBlueprint, translateIdea, GeminiError } from './services/gemini';
+import { generateIdeas, verifyIdea, generateBlueprint, translateIdea, AIError } from './services/ai';
 import ConfigPanel from './components/ConfigPanel';
 import TerminalOutput from './components/TerminalOutput';
 import IdeaCard from './components/IdeaCard';
@@ -20,6 +20,18 @@ const truncateAddress = (address?: string) => {
   if (!address) return null;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
+
+const cloneIdea = (idea: Idea): Idea => ({
+  ...idea,
+  features: [...idea.features],
+  verificationResult: idea.verificationResult
+    ? {
+        ...idea.verificationResult,
+        similarProjects: idea.verificationResult.similarProjects.map(project => ({ ...project })),
+      }
+    : undefined,
+  blueprint: idea.blueprint ? { ...idea.blueprint } : undefined,
+});
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>(() => {
@@ -50,14 +62,33 @@ const App: React.FC = () => {
 
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [userApiKey, setUserApiKey] = useState('');
+  const [aiSettings, setAiSettings] = useState<AISettings>({});
 
-  // Load API Key from Local Storage on mount
   useEffect(() => {
-    const storedKey = localStorage.getItem('idea_forge_api_key');
-    if (storedKey) {
-      setUserApiKey(storedKey);
+    if (typeof window === 'undefined') return;
+    const storedConfig = window.localStorage.getItem('idea_forge_ai_config');
+    if (storedConfig) {
+      try {
+        setAiSettings(JSON.parse(storedConfig));
+        return;
+      } catch {
+        // ignore
+      }
     }
+    const legacyKey = window.localStorage.getItem('idea_forge_api_key');
+    if (legacyKey) {
+      setAiSettings({
+        apiKey: legacyKey,
+        baseUrl: process.env.OPENAI_BASE_URL,
+        model: process.env.OPENAI_MODEL,
+      });
+      return;
+    }
+    setAiSettings({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseUrl: process.env.OPENAI_BASE_URL,
+      model: process.env.OPENAI_MODEL,
+    });
   }, []);
 
   // Persist language preference locally whenever it changes
@@ -82,9 +113,11 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleSaveSettings = (key: string) => {
-    setUserApiKey(key);
-    localStorage.setItem('idea_forge_api_key', key);
+  const handleSaveSettings = (config: AISettings) => {
+    setAiSettings(config);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('idea_forge_ai_config', JSON.stringify(config));
+    }
     setIsSettingsOpen(false);
     addLog("System configuration updated.", 'success');
   };
@@ -101,7 +134,7 @@ const App: React.FC = () => {
     let message = "An unexpected error occurred.";
     let code = undefined;
 
-    if (error instanceof GeminiError) {
+    if (error instanceof AIError) {
       title = "AI Model Error";
       message = error.message;
       code = error.code;
@@ -135,8 +168,8 @@ const App: React.FC = () => {
     setTimeout(() => addLog(t.app.logs.analyze.replace('{sectors}', config.sectors.join(', '))), 1200);
 
     try {
-      // Pass the userApiKey to the service
-      const generatedIdeas = await generateIdeas(config, lang, userApiKey);
+      // Pass the stored AI configuration to the service
+      const generatedIdeas = await generateIdeas(config, lang, aiSettings);
 
       generatedIdeas.forEach((_, i) => {
         setTimeout(() => {
@@ -146,17 +179,7 @@ const App: React.FC = () => {
 
       setIdeas(generatedIdeas);
       const batchLabelDate = new Date().toLocaleString(lang, { hour12: false });
-      const clonedBatchIdeas = generatedIdeas.map(idea => ({
-        ...idea,
-        features: [...idea.features],
-        verificationResult: idea.verificationResult
-          ? {
-              ...idea.verificationResult,
-              similarProjects: idea.verificationResult.similarProjects.map(project => ({ ...project })),
-            }
-          : undefined,
-        blueprint: idea.blueprint ? { ...idea.blueprint } : undefined,
-      }));
+      const clonedBatchIdeas = generatedIdeas.map(cloneIdea);
       const newBatch: IdeaBatch = {
         id: crypto.randomUUID(),
         label: `${batchLabelDate} • ${config.mode === 'TARGETED' ? t.config.mode_targeted : t.config.mode_chaos}`,
@@ -181,7 +204,8 @@ const App: React.FC = () => {
   const handleRestoreBatch = (batchId: string) => {
     const batch = generatedBatches.find(b => b.id === batchId);
     if (!batch) return;
-    setIdeas(batch.ideas);
+    const restoredIdeas = batch.ideas.map(cloneIdea);
+    setIdeas(restoredIdeas);
     setSelectedIdea(null);
     setActiveBlueprint(undefined);
     addLog(`Restored batch from ${new Intl.DateTimeFormat(lang, {
@@ -197,7 +221,7 @@ const App: React.FC = () => {
     addLog(t.app.logs.verify_start.replace('{title}', idea.title), 'warning');
 
     try {
-      const result = await verifyIdea(idea, lang, userApiKey);
+      const result = await verifyIdea(idea, lang, aiSettings);
       setIdeas(prev => prev.map(i => i.id === idea.id ? {
         ...i,
         status: 'VERIFIED',
@@ -223,7 +247,7 @@ const App: React.FC = () => {
     if (!idea.blueprint) {
       // Generate on fly
       try {
-        const blueprint = await generateBlueprint(idea, lang, userApiKey);
+        const blueprint = await generateBlueprint(idea, lang, aiSettings);
         setActiveBlueprint(blueprint);
         // Cache it
         setIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, blueprint } : i));
@@ -239,7 +263,7 @@ const App: React.FC = () => {
   const handleTranslate = async (idea: Idea) => {
     setTranslatingIds(prev => new Set(prev).add(idea.id));
     try {
-      const translatedIdea = await translateIdea(idea, lang, userApiKey);
+      const translatedIdea = await translateIdea(idea, lang, aiSettings);
       setIdeas(prev => prev.map(i => i.id === idea.id ? translatedIdea : i));
       addLog(`Translated ${idea.title} to ${lang}`, 'success');
     } catch (error) {
@@ -411,7 +435,7 @@ const App: React.FC = () => {
       {/* Settings Modal */}
       {isSettingsOpen && (
         <SettingsModal
-          currentApiKey={userApiKey}
+          currentConfig={aiSettings}
           onSave={handleSaveSettings}
           onClose={() => setIsSettingsOpen(false)}
           t={t.settings}
@@ -425,6 +449,7 @@ const App: React.FC = () => {
           blueprint={activeBlueprint}
           onClose={() => setSelectedIdea(null)}
           t={t.modal}
+          aiConfig={aiSettings}
         />
       )}
 

@@ -1,15 +1,44 @@
 import React, { useState, useMemo } from 'react';
-import { Idea, Blueprint } from '../types';
-import { generateContractCode } from '../services/gemini';
+import { Idea, Blueprint, AISettings } from '../types';
+import { generateContractCode } from '../services/ai';
 import { X, Code, Terminal, UploadCloud, Cpu, FileText, CheckCircle2, Copy, Download } from 'lucide-react';
 import { PDFDocument, StandardFonts, rgb, PDFFont } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 interface BlueprintModalProps {
     idea: Idea;
     blueprint: Blueprint | undefined;
     onClose: () => void;
     t: any;
+    aiConfig?: AISettings;
 }
+
+const CUSTOM_FONT_PATHS = ['/fonts/NotoSansSC-Regular.otf'];
+let cachedFontBytes: Promise<Uint8Array | null> | null = null;
+
+const loadCustomFontBytes = async () => {
+    if (!cachedFontBytes) {
+        cachedFontBytes = (async () => {
+            for (const path of CUSTOM_FONT_PATHS) {
+                try {
+                    const response = await fetch(path);
+                    if (!response.ok) {
+                        continue;
+                    }
+                    const buffer = await response.arrayBuffer();
+                    if (buffer.byteLength === 0) continue;
+                    return new Uint8Array(buffer);
+                } catch (error) {
+                    console.warn(`Failed to load font at ${path}`, error);
+                    continue;
+                }
+            }
+            console.warn('Failed to load custom PDF font from any known path.');
+            return null;
+        })();
+    }
+    return cachedFontBytes;
+};
 
 const wrapTextLines = (text: string, font: PDFFont, size: number, maxWidth: number) => {
     const results: string[] = [];
@@ -67,7 +96,11 @@ const wrapTextLines = (text: string, font: PDFFont, size: number, maxWidth: numb
 
 const createPdfBlob = async (text: string) => {
     const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    pdfDoc.registerFontkit(fontkit);
+    const customFontBytes = await loadCustomFontBytes();
+    const font = customFontBytes
+        ? await pdfDoc.embedFont(customFontBytes)
+        : await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontSize = 12;
     const lineHeight = 16;
     const margin = 36;
@@ -130,7 +163,7 @@ const blueprintToMarkdown = (idea: Idea, blueprint: Blueprint) => {
     return sections.join('\n');
 };
 
-const BlueprintModal: React.FC<BlueprintModalProps> = ({ idea, blueprint, onClose, t }) => {
+const BlueprintModal: React.FC<BlueprintModalProps> = ({ idea, blueprint, onClose, t, aiConfig }) => {
     const [activeTab, setActiveTab] = useState<'DOCS' | 'BUILDER'>('DOCS');
     const [buildStep, setBuildStep] = useState<number>(0); // 0: Idle, 1: Contract, 2: Dapp, 3: Deploy
     const [contractCode, setContractCode] = useState<string>('');
@@ -147,7 +180,7 @@ const BlueprintModal: React.FC<BlueprintModalProps> = ({ idea, blueprint, onClos
         // Step 1: Generate Contract
         try {
             addToLog("Agent: Generating Solidity Smart Contract...");
-            const code = await generateContractCode(idea);
+        const code = await generateContractCode(idea, aiConfig);
             setContractCode(code);
             addToLog("Contract compiled successfully. Bytecode size: 24KB.");
 

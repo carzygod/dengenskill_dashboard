@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, Key } from 'lucide-react';
+import { AISettings } from '../types';
 
 interface SettingsModalProps {
-  currentApiKey: string;
-  onSave: (key: string) => void;
+  currentConfig: AISettings;
+  onSave: (config: AISettings) => void;
   onClose: () => void;
   t: any;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ currentApiKey, onSave, onClose, t }) => {
-  const [apiKey, setApiKey] = useState(currentApiKey);
+const SettingsModal: React.FC<SettingsModalProps> = ({ currentConfig, onSave, onClose, t }) => {
+  const [apiKey, setApiKey] = useState(currentConfig.apiKey || '');
+  const [baseUrl, setBaseUrl] = useState(currentConfig.baseUrl || '');
+  const [model, setModel] = useState(currentConfig.model || '');
+
+  useEffect(() => {
+    setApiKey(currentConfig.apiKey || '');
+    setBaseUrl(currentConfig.baseUrl || '');
+    setModel(currentConfig.model || '');
+  }, [currentConfig]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
@@ -30,18 +39,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentApiKey, onSave, on
 
         {/* Content */}
         <div className="p-8 space-y-6">
-            <div className="space-y-2">
-                <label className="text-xs font-mono text-[#00FF94] uppercase tracking-widest">{t.api_label}</label>
-                <input 
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={t.api_placeholder}
-                    className="w-full bg-black border border-white/10 rounded-lg p-3 text-white focus:border-[#00FF94] focus:outline-none transition-colors font-mono text-sm"
-                />
-                <p className="text-xs text-gray-500">{t.api_desc}</p>
-            </div>
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-[#00FF94] uppercase tracking-widest">{t.api_label}</label>
+            <input 
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={t.api_placeholder}
+              className="w-full bg-black border border-white/10 rounded-lg p-3 text-white focus:border-[#00FF94] focus:outline-none transition-colors font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500">{t.api_desc}</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-[#00FF94] uppercase tracking-widest">{t.base_url_label}</label>
+            <input
+              type="text"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder={t.base_url_placeholder}
+              className="w-full bg-black border border-white/10 rounded-lg p-3 text-white focus:border-[#00FF94] focus:outline-none transition-colors font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500">{t.base_url_desc}</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-mono text-[#00FF94] uppercase tracking-widest">{t.model_label}</label>
+            <input
+              type="text"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder={t.model_placeholder}
+              className="w-full bg-black border border-white/10 rounded-lg p-3 text-white focus:border-[#00FF94] focus:outline-none transition-colors font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500">{t.model_desc}</p>
+          </div>
         </div>
+
+        {/* Persistence Note */}
+        {t.persist_note && (
+          <div className="px-8 space-y-1">
+            <p className="text-[11px] text-gray-500">{t.persist_note}</p>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="p-6 border-t border-white/10 bg-[#0A0A0A] flex gap-4">
@@ -52,7 +92,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentApiKey, onSave, on
                 {t.cancel}
              </button>
              <button 
-                onClick={() => onSave(apiKey)}
+            onClick={() => onSave({ apiKey, baseUrl, model })}
                 className="flex-1 py-3 text-sm font-mono font-bold text-black bg-[#00FF94] hover:bg-[#00CC76] rounded transition-colors flex items-center justify-center gap-2"
              >
                 <Save className="w-4 h-4" /> {t.save}

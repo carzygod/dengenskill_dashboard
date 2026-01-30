@@ -29,9 +29,9 @@ const BatchDrawer: React.FC<BatchDrawerProps> = ({ batches, onRestore, isOpen, o
   return (
     <>
       <aside
-        className={`fixed top-0 right-0 bottom-0 z-40 flex w-full flex-col bg-black/95 border-l border-white/10 shadow-2xl transition-transform duration-300 sm:w-80 lg:w-80 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+      className={`fixed top-0 right-0 bottom-0 z-40 flex flex-col w-full max-w-[min(100%,28rem)] bg-black/95 border-l border-white/10 shadow-2xl transition-transform duration-300 sm:w-80 lg:w-96 ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div>
